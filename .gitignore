@@ -1,0 +1,5 @@
+_build
+_examples_and_tutorials
+.vscode
+Sim*
+External__*
