@@ -25,6 +25,23 @@ newExtendedVector = function (x, y, z, w)
         distanceTo = function (self, other)
             return ((self.x - other.x)^2 + (self.y - other.y)^2 + (self.z - other.z)^2)^0.5
         end,
+        toCartesian = function (self)
+            self.x, self.y, self.z = self.x * math.sin(self.y) * math.cos(self.z), self.x * math.cos(self.y) * math.cos(self.z), self.x * math.sin(self.z)
+        end,
+        rotate3D = function (self, rotation)
+            local sx, sy, sz, cx, cy, cz = math.sin(rotation.x), math.sin(rotation.y), math.sin(rotation.z), math.cos(rotation.x), math.cos(rotation.y), math.cos(rotation.z)
+            self.x, self.y, self.z =
+            self.x*(cz*cy-sz*sx*sy) + self.y*(-sz*cx) + self.z*(cz*sy+sz*sx*cy),
+            self.x*(sz*cy+cz*sx*sy) + self.y*(cz*cx) + self.z*(sz*sy-cz*sx*cy),
+            self.x*(-cx*sy) + self.y*(sx) + self.z*(cx*cy)
+        end,
+        unRotate3D = function (self, rotation)
+            local sx, sy, sz, cx, cy, cz = math.sin(rotation.x), math.sin(rotation.y), math.sin(rotation.z), math.cos(rotation.x), math.cos(rotation.y), math.cos(rotation.z)
+            self.x, self.y, self.z =
+            self.x*(cz*cy-sz*sx*sy) + self.y*(sz*cy+cz*sx*sy) + self.z*(-cx*sy),
+            self.x*(-sz*cx) + self.y*(cz*cx) + self.z*(sx),
+            self.x*(cz*sy+sz*sx*cy) + self.y*(sz*sy-cz*sx*cy) + self.z*(cx*cy)
+        end,
         get = function (self)
             return self.x, self.y, self.z
         end,
