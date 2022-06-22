@@ -48,10 +48,11 @@ newButton('aR', false, 1, 33, 27, 15, redOn, whiteOn, 'Auto\nRange')
 
 newButton('aA', true, 1, 49, 21, 15, redOff, whiteOff, 'Auto\nAim', redOn, whiteOn)
 newButton('aF', true, 23, 49, 21, 15, redOff, whiteOff, 'Auto\nFire', redOn, whiteOn)
+newButton('aT', true, 1, 65, 43, 15, redOff, whiteOff, 'Aim\nGround', redOff, whiteOff, 'Aim\nAir')
 
-newButton('aZ', true, 1, 65, 43, 15, greenOff, whiteOff, 'Add Safe\nZone', greenOn, whiteOn)
-newButton('rZ', true, 1, 81, 43, 15, redOff, whiteOff, 'Remove\nZone', redOn, whiteOn)
-newButton('cZ', true, 1, 97, 43, 15, redOff, whiteOff, 'Clear\nZones', redOn, whiteOn)
+newButton('aZ', true, 1, 81, 43, 15, greenOff, whiteOff, 'Add Safe\nZone', greenOn, whiteOn)
+newButton('rZ', true, 1, 97, 43, 15, redOff, whiteOff, 'Remove\nZone', redOn, whiteOn)
+newButton('cZ', true, 1, 113, 43, 15, redOff, whiteOff, 'Clear\nZones', redOn, whiteOn)
 shouldAddZone = false
 shouldRemoveZone = false
 
@@ -85,12 +86,12 @@ function onTick()
     output.setBool(25, buttons['kZO'].pressed)
     output.setBool(26, buttons['aA'].pressed)
     output.setBool(27, buttons['aF'].pressed)
-    output.setBool(28, false)
-    output.setBool(29, false)
+    output.setBool(29, buttons['aT'].pressed)
     output.setBool(30, buttons['cZ'].pressed)
     output.setBool(31, shouldRemoveZone)
     output.setBool(32, shouldAddZone)
     output.setNumber(1, (buttons['viewAA'].pressed and 1) or (buttons['viewAG'].pressed and 2) or (buttons['viewHeavy'].pressed and 3) or (buttons['viewTail'].pressed and 4) or 0)
+    output.setNumber(2, ((buttons['aT'].pressed and 15) or 24))
 end
 
 function onDraw()

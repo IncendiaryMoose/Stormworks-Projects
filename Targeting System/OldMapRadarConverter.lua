@@ -31,12 +31,16 @@ function getBinaryInput(startChannel, endChannel)
     end
     return result
 end
-minDist = property.getNumber('Minimum Distance')
-maxDist = property.getNumber('Maximum Distance')
-wepRange = property.getNumber('Weapons Range')
+minDist = property.getNumber("Minimum Distance")
+maxDist = property.getNumber("Maximum Distance")
+wepRange = property.getNumber("Weapons Range")
 groupDist = property.getNumber('Group Distance')
 vehiclePosition = newRotatableVector()
+previousVehiclePosition = newRotatableVector()
+vehiclePositionVelocity = newRotatableVector()
 vehicleRotation = newRotatableVector()
+previousVehicleRotation = newRotatableVector()
+vehicleRotationVelocity = newRotatableVector()
 screenClickPos = newRotatableVector()
 worldClickPos = newRotatableVector()
 click = false
@@ -45,14 +49,17 @@ PI2 = PI*2
 zoom = 3
 zSpeed = 0.03
 killZone = 800
-killSpeed = 3
+killSpeed = 2
 distSpeed = 3
 h = 160
 w = 288
 safeZones = {}
+targetGroups = {}
 wasAddingZone = false
 wasRemovingZone = false
-
+facing = 0
+tocks = 0
+tickCorrection = 1
 function onTick()
     clearOutputs()
     targetGroups = {}
@@ -71,34 +78,40 @@ function onTick()
     removingZone = input.getBool(31)
     addingZone = input.getBool(32)
 	screenClickPos:set(getBinaryInput(1, 9), getBinaryInput(10, 18))
-    vehiclePosition:set(input.getNumber(8), input.getNumber(12), input.getNumber(16))
-    vehicleRotation:set(input.getNumber(20), input.getNumber(24), input.getNumber(28), input.getNumber(32))
+    vehiclePosition:set(input.getNumber(2), input.getNumber(6), input.getNumber(10))
+    vehiclePositionVelocity:setSubtract(vehiclePosition, previousVehiclePosition)
+    vehiclePositionVelocity:setScale(tickCorrection)
+    previousVehiclePosition:copy(vehiclePosition)
+    --vehiclePosition:setAdd(vehiclePosition, vehiclePositionVelocity)
+    vehicleRotation:set(input.getNumber(14), input.getNumber(18), input.getNumber(22), input.getNumber(26))
     vehicleRotation:setScale(PI2)
     vehicleRotation.y = math.atan(math.sin(vehicleRotation.y), math.sin(vehicleRotation.w))
-    if input.getNumber(4) == 0 then
-        for i=0, 7, 1 do
-            local targetPosition = newRotatableVector(input.getNumber(i*4+1),input.getNumber(i*4+2)*PI2, input.getNumber(i*4+3)*PI2)
-            if targetPosition.x > minDist and targetPosition.x < maxDist then
-                targetPosition:toCartesian()
-                targetPosition:rotate3D(vehicleRotation)
-                targetPosition:setAdd(targetPosition, vehiclePosition)
-                for z, zone in ipairs(safeZones) do
-                    if targetPosition:distanceTo(zone) < zone.w then
+    vehicleRotationVelocity:setSubtract(vehicleRotation, previousVehicleRotation)
+    vehicleRotationVelocity:setScale(tickCorrection)
+    previousVehicleRotation:copy(vehicleRotation)
+    --vehicleRotation:setAdd(vehicleRotation, vehicleRotationVelocity)
+    for i=0, 7, 1 do
+        local targetPosition = newRotatableVector(input.getNumber(i*4+1), input.getNumber(i*4+4)*PI2, input.getNumber(i*4+3)*PI2)
+        if targetPosition.x > minDist and targetPosition.x < maxDist then
+            targetPosition:toCartesian()
+            targetPosition:rotate3D(vehicleRotation)
+            targetPosition:setAdd(targetPosition, vehiclePosition)
+            for z, zone in ipairs(safeZones) do
+                if targetPosition:distanceTo(zone) < zone.w then
+                    goto safe
+                end
+            end
+            local targetDistance = targetPosition:distanceTo(vehiclePosition)
+            for k, group in ipairs(targetGroups) do
+                for j, groupPosition in ipairs(group) do
+                    if groupPosition:distanceTo(targetPosition) < groupDist + targetDistance/25 then
+                        table.insert(group, targetPosition:clone())
                         goto safe
                     end
                 end
-                local targetDistance = targetPosition:distanceTo(vehiclePosition)
-                for k, group in ipairs(targetGroups) do
-                    for j, groupPosition in ipairs(group) do
-                        if groupPosition:distanceTo(targetPosition) < groupDist + targetDistance/25 then
-                            table.insert(group, targetPosition:clone())
-                            goto safe
-                        end
-                    end
-                end
-                table.insert(targetGroups, {targetPosition:clone()})
-                ::safe::
             end
+            table.insert(targetGroups, {targetPosition:clone()})
+            ::safe::
         end
     end
     targetCounter = 0
@@ -129,7 +142,7 @@ function onDraw()
 	screen.setMapColorShallows(50, 50, 100)
 
 	screen.drawMap(vehiclePosition.x, vehiclePosition.y, zoom)
-    if click and screenClickPos.x > 45 and screenClickPos.x < w-45 then
+	if click and screenClickPos.x > 45 and screenClickPos.x < w-45 then
         worldClickPos.z = vehiclePosition.z
         worldClickPos.x, worldClickPos.y = map.screenToMap(vehiclePosition.x, vehiclePosition.y, zoom, w, h, screenClickPos.x, screenClickPos.y)
     end

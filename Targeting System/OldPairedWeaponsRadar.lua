@@ -18,11 +18,11 @@ onLBSimulatorTick = function(simulator, ticks)
 end
 ---@endsection
 require("Vector_Math")
-require("Target_Group")
+require("Old_Target_Group")
 require("In_Out")
 maxError = 20
-maxMemory = 30
-maxAge = 15
+maxMemory = 15
+maxAge = 30
 velocityThreshold = 0.25
 distanceFactor = 0.075
 speedFactor = 60
@@ -32,6 +32,7 @@ worldClickPos = newVector()
 h = 160
 w = 288
 zoom = 3
+autoTarget = 1
 function onTick()
 	clearOutputs()
     vehiclePosition:set(getInputVector(25))
@@ -52,10 +53,9 @@ function onTick()
 	for i, potentialThreat in ipairs(targetThreats) do
 		local newThreat = oldTargetGroup[potentialThreat.ID]
 		local clickDist = worldClickPos:distanceTo(newThreat.position.predicted)
-		highestAirThreat = (newThreat.verticalPlacement > -0.001 and selectThreat(highestAirThreat, newThreat, clickDist)) or highestAirThreat
+		highestAirThreat = (newThreat.verticalPlacement > -0.002 and selectThreat(highestAirThreat, newThreat, clickDist)) or highestAirThreat
 		highestGroundThreat = (newThreat.verticalPlacement < 0.015 and selectThreat(highestGroundThreat, newThreat, clickDist)) or highestGroundThreat
 	end
-	outputBools[1] = autoAim
 	outputNumbers[14] = finalCount
 	setOutputToVector(1, worldClickPos)
 	setOutputToTarget(15, highestAirThreat)
@@ -73,7 +73,7 @@ function setOutputToTarget(channel, outputTarget)
 	end
 end
 function selectThreat(currentThreat, newThreat, clickDist)
-	if (not currentThreat) or (autoAim and newThreat.threat < 350 and newThreat.threat + 300 < currentThreat.threat) or (click and clickDist < worldClickPos:distanceTo(currentThreat.position.predicted)) then
+	if (not currentThreat) or (autoAim and newThreat.threat < 300 and newThreat.threat + 300 < currentThreat.threat) or (click and clickDist < worldClickPos:distanceTo(currentThreat.position.predicted)) then
 		currentThreat = newThreat
 	end
 	return currentThreat
