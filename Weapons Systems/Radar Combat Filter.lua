@@ -18,7 +18,7 @@ onLBSimulatorTick = function(simulator, ticks)
 end
 ---@endsection
 require("Vector_Math")
-require("Target_Group")
+require("Radar_Target_Manager")
 require("In_Out")
 maxError = 20
 maxMemory = 30

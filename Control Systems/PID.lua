@@ -59,7 +59,7 @@ function CreateNewVelocityPID(proportional_gain,integral_gain,derivitive_gain,ma
         self.setpoint = setpoint
         self.speed = process_variable - self.process_variable
         self.process_variable = process_variable
-        self.error = (self.setpoint - self.process_variable)/10
+        self.error = (self.setpoint - self.process_variable)/15
         self.speed_error = self.error - self.speed
         self.proportional = self.speed_error * self.proportional_gain
         self.integral = self.integral + self.speed_error * self.integral_gain

@@ -31,16 +31,15 @@ function getBinaryInput(startChannel, endChannel)
     end
     return result
 end
-minDist = property.getNumber("Minimum Distance")
-maxDist = property.getNumber("Maximum Distance")
-wepRange = property.getNumber("Weapons Range")
+minDist = property.getNumber('Minimum Distance')
+maxDist = property.getNumber('Maximum Distance')
+wepRange = property.getNumber('Weapons Range')
 groupDist = property.getNumber('Group Distance')
+gpsCorrection = property.getNumber('GPS Correction')
 vehiclePosition = newRotatableVector()
 previousVehiclePosition = newRotatableVector()
 vehiclePositionVelocity = newRotatableVector()
 vehicleRotation = newRotatableVector()
-previousVehicleRotation = newRotatableVector()
-vehicleRotationVelocity = newRotatableVector()
 screenClickPos = newRotatableVector()
 worldClickPos = newRotatableVector()
 click = false
@@ -58,8 +57,6 @@ targetGroups = {}
 wasAddingZone = false
 wasRemovingZone = false
 facing = 0
-tocks = 0
-tickCorrection = 1
 function onTick()
     clearOutputs()
     targetGroups = {}
@@ -80,18 +77,18 @@ function onTick()
 	screenClickPos:set(getBinaryInput(1, 9), getBinaryInput(10, 18))
     vehiclePosition:set(input.getNumber(2), input.getNumber(6), input.getNumber(10))
     vehiclePositionVelocity:setSubtract(vehiclePosition, previousVehiclePosition)
-    vehiclePositionVelocity:setScale(tickCorrection)
+    vehiclePositionVelocity:setScale(gpsCorrection)
     previousVehiclePosition:copy(vehiclePosition)
-    --vehiclePosition:setAdd(vehiclePosition, vehiclePositionVelocity)
+    vehiclePosition:setAdd(vehiclePosition, vehiclePositionVelocity)
     vehicleRotation:set(input.getNumber(14), input.getNumber(18), input.getNumber(22), input.getNumber(26))
+    outputNumbers[28] = vehicleRotation.z
     vehicleRotation:setScale(PI2)
     vehicleRotation.y = math.atan(math.sin(vehicleRotation.y), math.sin(vehicleRotation.w))
-    vehicleRotationVelocity:setSubtract(vehicleRotation, previousVehicleRotation)
-    vehicleRotationVelocity:setScale(tickCorrection)
-    previousVehicleRotation:copy(vehicleRotation)
-    --vehicleRotation:setAdd(vehicleRotation, vehicleRotationVelocity)
     for i=0, 7, 1 do
-        local targetPosition = newRotatableVector(input.getNumber(i*4+1), input.getNumber(i*4+4)*PI2, input.getNumber(i*4+3)*PI2)
+        local azimuth = input.getNumber(i*4+4)*PI2
+        local elevation = input.getNumber(i*4+3)*PI2
+        azimuth = math.asin(math.sin(azimuth)/math.cos(elevation))
+        local targetPosition = newRotatableVector(input.getNumber(i*4+1), facing + azimuth, elevation)
         if targetPosition.x > minDist and targetPosition.x < maxDist then
             targetPosition:toCartesian()
             targetPosition:rotate3D(vehicleRotation)
@@ -131,6 +128,7 @@ function onTick()
     outputNumbers[31] = worldClickPos.y
     outputNumbers[32] = zoom
     setOutputs()
+    facing = input.getNumber(30) * PI2
 end
 function onDraw()
 

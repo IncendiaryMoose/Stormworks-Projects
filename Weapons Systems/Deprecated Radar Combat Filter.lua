@@ -18,10 +18,10 @@ onLBSimulatorTick = function(simulator, ticks)
 end
 ---@endsection
 require("Vector_Math")
-require("Old_Target_Group")
 require("In_Out")
+require('Deprecated_Radar_Target_Manager')
 maxError = 20
-maxMemory = 15
+maxMemory = 5
 maxAge = 30
 velocityThreshold = 0.25
 distanceFactor = 0.075
@@ -36,7 +36,7 @@ autoTarget = 1
 function onTick()
 	clearOutputs()
     vehiclePosition:set(getInputVector(25))
-
+	vehicleYaw = input.getNumber(28)
 	zoom = input.getNumber(32)
 	click = input.getBool(2)
 	worldClickPos:set(input.getNumber(30), input.getNumber(31), vehiclePosition.z)
@@ -48,26 +48,17 @@ function onTick()
 	autoTargetButton = input.getBool(8)
 
 	trackTargets()
-	highestAirThreat = highestAirThreat and oldTargetGroup[highestAirThreat.ID]
-	highestGroundThreat = highestGroundThreat and oldTargetGroup[highestGroundThreat.ID]
-	for i, potentialThreat in ipairs(targetThreats) do
-		local newThreat = oldTargetGroup[potentialThreat.ID]
-		local clickDist = worldClickPos:distanceTo(newThreat.position.predicted)
-		highestAirThreat = (newThreat.verticalPlacement > -0.002 and selectThreat(highestAirThreat, newThreat, clickDist)) or highestAirThreat
-		highestGroundThreat = (newThreat.verticalPlacement < 0.015 and selectThreat(highestGroundThreat, newThreat, clickDist)) or highestGroundThreat
+	threatCount = 0
+	for i, sectionTarget in ipairs(sectionTargets) do
+		setOutputToTarget(9+(i-1)*3, oldTargetGroup[sectionTarget.ID])
 	end
-	outputNumbers[14] = finalCount
 	setOutputToVector(1, worldClickPos)
-	setOutputToTarget(15, highestAirThreat)
-	setOutputToTarget(24, highestGroundThreat)
-	outputNumbers[4] = (autoAim and ((autoTargetButton and outputBools[16] and 15) or ((not autoTargetButton) and outputBools[25] and 24))) or 1
+	outputNumbers[4] = finalCount
 	setOutputs()
 end
 function setOutputToTarget(channel, outputTarget)
 	if outputTarget then
 		setOutputToVector(channel, outputTarget.position.predicted)
-		setOutputToVector(channel + 3, outputTarget.velocity.average)
-		setOutputToVector(channel + 6, outputTarget.acceleration.average)
 		outputBools[channel] = (outputTarget.age < 15) and (manualFire or (autoFire and outputTarget.distance < autoRange))
 		outputBools[channel + 1] = true
 	end
@@ -82,13 +73,9 @@ function onDraw()
 	for l, targetData in pairs(oldTargetGroup) do
 		local positionScreenX, positionScreenY = map.mapToScreen(vehiclePosition.x, vehiclePosition.y, zoom, w, h, targetData.position.predicted.x, targetData.position.predicted.y)
 		screen.setColor(0, 255, 0)
-		--screen.drawTextBox(positionScreenX+10,positionScreenY, 90, 15, string.format('Speed: %.2f mph\nAltitude: %.0f ft\nHeading: %.2f deg',10, 500, 45), -1, 0)
-		local airTarget, groundTarget, pointDirection, text = highestAirThreat and highestAirThreat.ID == targetData.ID, highestGroundThreat and highestGroundThreat.ID == targetData.ID, 11, nil
-		if airTarget or groundTarget then
-			text = (airTarget and groundTarget and "Target") or (airTarget and "Air\nTarget") or "Ground\nTarget"
-			screen.setColor(255,255,255)
-			screen.drawTextBox((positionScreenX-w/2 > 0 and clamp(positionScreenX-38, 57, w-87)) or clamp(positionScreenX+8, 57, w-87), clamp(positionScreenY-7, 0, h-14), 30, 15, text, 0, 0)
-		end
+		local pointDirection, text = 11, nil
+		text = string.format('%.3f', targetData.horizontalPlacement)
+		screen.drawTextBox((positionScreenX-w/2 > 0 and clamp(positionScreenX-38, 57, w-87)) or clamp(positionScreenX+8, 57, w-87), clamp(positionScreenY-7, 0, h-14), 30, 15, text, -1, 0)
 		pointDirection = (inRect(positionScreenX, positionScreenY, 48, 4, w-48, h-4) and ((targetData.verticalPlacement < -0.01 and PI) or (targetData.verticalPlacement > 0.01 and 0) or 11)) or math.atan(positionScreenX-w/2, h/2-positionScreenY)
 		if pointDirection ~= 11 then
 			drawArrow(clamp(positionScreenX, 51, w-50), clamp(positionScreenY, 5, h-4), pointDirection)

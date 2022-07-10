@@ -1,3 +1,5 @@
+/_build/
+!/_build/_buildactions.lua
 _build
 _examples_and_tutorials
 .vscode
@@ -5,3 +7,5 @@ Sim*
 External__*
 out
 Old__*
+Test__*
+Discord__*

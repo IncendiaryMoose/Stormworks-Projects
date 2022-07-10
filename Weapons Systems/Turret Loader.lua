@@ -30,9 +30,9 @@ function onTick()
     turretPitch = turretPitch + turretPitchVelocity*10
     leftMag = input.getNumber(4)
     rightMag = input.getNumber(5)
-    if leftMag == 20 and rightMag == 20 then
+    if leftMag >= 18 and rightMag >= 18 then
         reloading = true
-    elseif leftMag == 0 or rightMag == 0 then
+    elseif leftMag <= 2 or rightMag <= 2 then
         reloading = false
     end
     if reloading then
@@ -44,14 +44,11 @@ function onTick()
         restockTime = restockTime + 1
 		yawPivot = 4*yawSpeed(loaderYaw, turretYaw)
     end
-    if reloadTime > 0 then
-        slider = 1
-    else
+    if restockTime > 8 then
         slider = -1
-    end
-    if restockTime > 5 then
         pitchPivot = 0
     else
+        slider = 1
         pitchPivot = turretPitch*4
     end
 	output.setNumber(1, yawPivot)
