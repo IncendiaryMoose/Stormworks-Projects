@@ -1,4 +1,4 @@
-newExtendedVector = function (x, y, z, w)
+newVector = function (x, y, z, w)
     return {
         x = x or 0,
         y = y or 0,
@@ -10,11 +10,14 @@ newExtendedVector = function (x, y, z, w)
             self.z = c or self.z
             self.w = d or self.w
         end,
-        setAdd = function (self, vecA, vecB)
-            self:set(vecA.x + vecB.x, vecA.y + vecB.y, vecA.z + vecB.z)
+        setAdd = function (self, other)
+            self:set(self.x + other.x, self.y + other.y, self.z + other.z)
         end,
-        setSubtract = function (self, vecA, vecB)
-            self:set(vecA.x - vecB.x, vecA.y - vecB.y, vecA.z - vecB.z)
+        setScaledAdd = function (self, other, scalar)
+            self:set(self.x + other.x * scalar, self.y + other.y * scalar, self.z + other.z * scalar)
+        end,
+        setSubtract = function (self, other)
+            self:set(self.x - other.x, self.y - other.y, self.z - other.z)
         end,
         setScale = function (self, scalar)
             self:set(self.x * scalar, self.y * scalar, self.z * scalar, self.w * scalar)
@@ -28,27 +31,27 @@ newExtendedVector = function (x, y, z, w)
         toCartesian = function (self)
             self:set(self.x * math.sin(self.y) * math.cos(self.z), self.x * math.cos(self.y) * math.cos(self.z), self.x * math.sin(self.z))
         end,
-        rotate3D = function (self, rotation)
+        rotate3D = function (self, rotation, transposed)
             local sx, sy, sz, cx, cy, cz = math.sin(rotation.x), math.sin(rotation.y), math.sin(rotation.z), math.cos(rotation.x), math.cos(rotation.y), math.cos(rotation.z)
-            self:set(
-                self.x*(cz*cy-sz*sx*sy) + self.y*(-sz*cx) + self.z*(cz*sy+sz*sx*cy),
-                self.x*(sz*cy+cz*sx*sy) + self.y*(cz*cx) + self.z*(sz*sy-cz*sx*cy),
-                self.x*(-cx*sy) + self.y*(sx) + self.z*(cx*cy)
-            )
-        end,
-        unRotate3D = function (self, rotation)
-            local sx, sy, sz, cx, cy, cz = math.sin(rotation.x), math.sin(rotation.y), math.sin(rotation.z), math.cos(rotation.x), math.cos(rotation.y), math.cos(rotation.z)
-            self:set(
-                self.x*(cz*cy-sz*sx*sy) + self.y*(sz*cy+cz*sx*sy) + self.z*(-cx*sy),
-                self.x*(-sz*cx) + self.y*(cz*cx) + self.z*(sx),
-                self.x*(cz*sy+sz*sx*cy) + self.y*(sz*sy-cz*sx*cy) + self.z*(cx*cy)
-            )
+            if transposed then
+                self:set(
+                    self.x*(cz*cy-sz*sx*sy) + self.y*(sz*cy+cz*sx*sy) + self.z*(-cx*sy),
+                    self.x*(-sz*cx) + self.y*(cz*cx) + self.z*(sx),
+                    self.x*(cz*sy+sz*sx*cy) + self.y*(sz*sy-cz*sx*cy) + self.z*(cx*cy)
+                )
+            else
+                self:set(
+                    self.x*(cz*cy-sz*sx*sy) + self.y*(-sz*cx) + self.z*(cz*sy+sz*sx*cy),
+                    self.x*(sz*cy+cz*sx*sy) + self.y*(cz*cx) + self.z*(sz*sy-cz*sx*cy),
+                    self.x*(-cx*sy) + self.y*(sx) + self.z*(cx*cy)
+                )
+            end
         end,
         get = function (self)
             return self.x, self.y, self.z
         end,
         clone = function (self)
-            return newExtendedVector(self.x, self.y, self.z)
+            return newVector(self.x, self.y, self.z)
         end,
         copy = function (self, other)
             self:set(other.x, other.y, other.z)

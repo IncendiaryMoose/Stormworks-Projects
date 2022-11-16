@@ -10,6 +10,7 @@ end
 ---@endsection
 require("Rotation_Vector_Math")
 require("In_Out")
+require("Clamp")
 function avgVecList(list)
     if #list > 1 then
         local total = newRotatableVector()
@@ -37,6 +38,7 @@ wepRange = property.getNumber('Weapons Range')
 groupDist = property.getNumber('Group Distance')
 gpsCorrection = property.getNumber('GPS Correction')
 spinTime = property.getNumber('Spin Time')
+maxAge = property.getNumber('Max Age')
 spinCounter = 0
 spin = 0
 vehiclePosition = newRotatableVector()
@@ -57,15 +59,19 @@ distSpeed = 3
 h = 160
 w = 288
 safeZones = {}
-targetGroups = {}
+targets = {}
 wasAddingZone = false
 wasRemovingZone = false
 facing = 0
+targets = {}
 function onTick()
     clearOutputs()
     spinCounter = (spinCounter + 1)%spinTime
     spin = (spinCounter/spinTime) - 0.5
     targetGroups = {}
+
+    massNumber = input.getNumber(31)*100000000 + input.getNumber(32)
+
     click = input.getBool(19)
     zoomIn = input.getBool(20)
     zoomOut = input.getBool(21)
@@ -81,58 +87,79 @@ function onTick()
     removingZone = input.getBool(31)
     addingZone = input.getBool(32)
 	screenClickPos:set(getBinaryInput(1, 9), getBinaryInput(10, 18))
-    vehiclePosition:set(input.getNumber(10), input.getNumber(14), input.getNumber(18))
+
+    vehiclePosition:set(getInputVector(1))
     vehiclePositionVelocity:setSubtract(vehiclePosition, previousVehiclePosition)
     vehiclePositionVelocity:setScale(gpsCorrection)
     previousVehiclePosition:copy(vehiclePosition)
     vehiclePosition:setAdd(vehiclePosition, vehiclePositionVelocity)
-    vehicleRotation:set(input.getNumber(22), input.getNumber(26), input.getNumber(30))
-    outputNumbers[28] = vehicleRotation.z
+
+    vehicleRotation:set(getInputVector(4))
     vehicleRotation:setScale(PI2)
     radarYaw = facing - vehicleRotation.z
+
     for i = 0, 7, 1 do
-        local azimuth = input.getNumber(i*4+4)*PI2
-        local elevation = input.getNumber(i*4+3)*PI2
-        azimuth = math.asin(math.sin(azimuth)/math.cos(elevation))
-        local targetPosition = newRotatableVector(input.getNumber(i*4+1), facing + azimuth, elevation)
-        if targetPosition.x > minDist and targetPosition.x < maxDist then
-            targetPosition:toCartesian()
-            targetPosition:rotate3D(vehicleRotation)
-            targetPosition:setAdd(targetPosition, vehiclePosition)
-            for z, zone in ipairs(safeZones) do
-                if targetPosition:distanceTo(zone) < zone.w then
+        local targetPosition = newRotatableVector(getInputVector(i*3+7))
+        local targetMass = getMass(i+1)
+        targetPosition:rotate3D(vehicleRotation)
+        targetPosition:setAdd(targetPosition, vehiclePosition)
+        for z, zone in ipairs(safeZones) do
+            if targetPosition:distanceTo(zone) < zone.w then
+                goto safe
+            end
+        end
+        local targetDistance = targetPosition:distanceTo(vehiclePosition)
+        if targetDistance < maxDist and targetDistance > minDist then
+            for targetIndex, target in ipairs(targets) do
+                if targetMass == target.mass and target.position:distanceTo(targetPosition) < groupDist then
+                    targets[targetIndex].velocity:setSubtract(targetPosition, target.position)
+                    targets[targetIndex].velocity:setScale(1/target.age)
+                    targets[targetIndex].position:copy(targetPosition)
+                    targets[targetIndex].predictedPosition:copy(targetPosition)
+                    targets[targetIndex].mass = targetMass
+                    targets[targetIndex].age = 0
+                    targets[targetIndex].distance = targetDistance
                     goto safe
                 end
             end
-            local targetDistance = targetPosition:distanceTo(vehiclePosition)
-            for k, group in ipairs(targetGroups) do
-                for j, groupPosition in ipairs(group) do
-                    if groupPosition:distanceTo(targetPosition) < groupDist + targetDistance/25 then
-                        table.insert(group, targetPosition:clone())
-                        goto safe
-                    end
-                end
-            end
-            table.insert(targetGroups, {targetPosition:clone()})
-            ::safe::
+            table.insert(targets, {
+                mass = targetMass,
+                age = 0,
+                distance = targetDistance,
+                position = targetPosition:clone(),
+                predictedPosition = targetPosition:clone(),
+                velocity = newRotatableVector()
+            })
+        end
+        ::safe::
+    end
+    massNumber = 0
+    for targetIndex = #targets, 1, -1 do
+        targets[targetIndex].age = targets[targetIndex].age + 1
+        targets[targetIndex].predictedPosition:setAdd(targets[targetIndex].predictedPosition, targets[targetIndex].velocity)
+        if targets[targetIndex].age > maxAge then
+            table.remove(targets, targetIndex)
         end
     end
-    targetCounter = 0
-    for k, group in ipairs(targetGroups) do
-        setOutputToVector(1+targetCounter*3, avgVecList(group))
-        outputBools[1+targetCounter*3] = true
-        targetCounter = targetCounter + 1
+    table.sort(targets, function (a, b)
+        return a.distance - a.mass*20 < b.distance - b.mass*20
+    end)
+    for targetIndex, target in ipairs(targets) do
+        if targetIndex < 8 then
+            setOutputToVector((targetIndex-1)*3+9, target.predictedPosition)
+        end
     end
     setOutputToVector(25, vehiclePosition)
+    outputNumbers[30] = math.floor(massNumber/100000000)
+    outputNumbers[31] = massNumber%100000000
     outputBools[2] = click and screenClickPos.x > 45 and screenClickPos.x < w-45
     outputBools[3] = autoAim
     outputBools[5] = autoFire
     outputBools[6] = manualFire
     outputBools[8] = autoTarget
-    outputNumbers[28] = spin
     outputNumbers[29] = killZone
-    outputNumbers[30] = worldClickPos.x
-    outputNumbers[31] = worldClickPos.y
+    --outputNumbers[30] = worldClickPos.x
+    --outputNumbers[31] = worldClickPos.y
     outputNumbers[32] = zoom
     setOutputs()
     facing = spin * PI2
@@ -195,10 +222,19 @@ function onDraw()
     end
     screen.setColor(0, 255, 0, 35)
     screen.drawTriangleF(w/2, h/2, w/2 + w*math.sin(radarYaw+fov), h/2 - w*math.cos(radarYaw+fov), w/2 + w*math.sin(radarYaw-fov), h/2 - w*math.cos(radarYaw-fov))
+    for targetIndex, target in ipairs(targets) do
+        local positionScreenX, positionScreenY = map.mapToScreen(vehiclePosition.x, vehiclePosition.y, zoom, w, h, target.predictedPosition.x, target.predictedPosition.y)
+		screen.setColor(0, 255, 0)
+        screen.drawText(clamp(positionScreenX, 51, w-50), clamp(positionScreenY, 5, h-4), target.mass)
+    end
+    screen.drawTextBox(1, h-12, w, 11, string.format('Targets:\n%.0f',#targets), -1, -1)
 end
 function upDown(up, down, upDownValue, upDownSpeed, min, max)
     return math.min(math.max((down and (upDownValue - upDownSpeed)) or (up and (upDownValue + upDownSpeed)) or upDownValue, min), max)
 end
 function toScreen(n)
     return n*(w/(zoom*1000))
+end
+function getMass(index)
+    return math.floor(massNumber/(100^(8-index)))%100
 end

@@ -20,18 +20,24 @@ function CreateNewPID(proportional_gain,integral_gain,derivitive_gain,max_integr
         self.error = self.setpoint - self.process_variable
         self.proportional = self.error * self.proportional_gain
         self.integral = self.integral + self.error * self.integral_gain
-        self.integral = clamp(self.integral, -self.max_integral, self.max_integral)
+        if self.max_integral ~= 0 then
+            self.integral = clamp(self.integral, -self.max_integral, self.max_integral)
+        end
         self.derivitive = (self.previous_error and ((self.error - self.previous_error ) * self.derivitive_gain)) or 0
-        self.derivitive = clamp(self.derivitive,-self.max_derivitive,self.max_derivitive)
+        if self.max_derivitive ~= 0 then
+            self.derivitive = clamp(self.derivitive,-self.max_derivitive,self.max_derivitive)
+        end
         self.previous_error = self.error
         self.output = self.proportional + self.integral + self.derivitive
-        self.output = clamp(self.output, -self.max_value, self.max_value)
+        if self.max_value ~= 0 then
+            self.output = clamp(self.output, -self.max_value, self.max_value)
+        end
         self.startup = false
         return self.output
     end
     }
 end
-function CreateNewVelocityPID(proportional_gain,integral_gain,derivitive_gain,max_integral,max_derivitive,max_value)
+function CreateNewVelocityPID(proportional_gain, integral_gain, derivitive_gain, max_integral, max_derivitive, max_value)
     return {
     proportional_gain = proportional_gain,
     proportional = 0,
@@ -53,16 +59,22 @@ function CreateNewVelocityPID(proportional_gain,integral_gain,derivitive_gain,ma
         self.setpoint = setpoint
         self.speed = process_variable - self.process_variable
         self.process_variable = process_variable
-        self.error = (self.setpoint - self.process_variable)/15
+        self.error = (self.setpoint - self.process_variable)*10
         self.speed_error = self.error - self.speed
         self.proportional = self.speed_error * self.proportional_gain
         self.integral = self.integral + self.speed_error * self.integral_gain
-        self.integral = clamp(self.integral, -self.max_integral, self.max_integral)
+        if self.max_integral ~= 0 then
+            self.integral = clamp(self.integral, -self.max_integral, self.max_integral)
+        end
         self.derivitive = (self.previous_error and ((self.speed_error - self.previous_error ) * self.derivitive_gain)) or 0
-        self.derivitive = clamp(self.derivitive, -self.max_derivitive, self.max_derivitive)
+        if self.max_derivitive ~= 0 then
+            self.derivitive = clamp(self.derivitive, -self.max_derivitive, self.max_derivitive)
+        end
         self.previous_error = self.speed_error
         self.output = self.proportional + self.integral + self.derivitive + self.power_offset
-        self.output = clamp(self.output, -self.max_value, self.max_value)
+        if self.max_value ~= 0 then
+            self.output = clamp(self.output, -self.max_value, self.max_value)
+        end
         self.startup = false
         return self.output
     end

@@ -5,6 +5,9 @@ finalCount = 0
 tickCorrection = property.getNumber('Tick Correction')
 oldTargetGroup = {}
 newTargetGroup = {}
+function getMass(index)
+    return math.floor(massNumber/(100^(8-index)))%100
+end
 function newVectorData(initial)
     return {
         current = initial:clone(),
@@ -22,7 +25,7 @@ function newVectorData(initial)
         end
     }
 end
-function makeTarget(position)
+function makeTarget(position, mass)
     return {
         distanceDelta = 0,
         position = newVectorData(position),
@@ -31,6 +34,7 @@ function makeTarget(position)
         jerk = newVectorData(newVector()),
         ID = string.format('%.2f',position.x),
         age = 1,
+        mass = mass,
         updateTarget = function(self)
             if self.updated then
                 self.position:update()
@@ -38,17 +42,12 @@ function makeTarget(position)
                 self.velocity:update(self.position, self.age)
                 self.acceleration:update(self.velocity, self.age)
                 self.jerk:update(self.acceleration, self.age)
-                for j = 1, tickCorrection, 1 do
-                    --self.acceleration.predicted:setAdd(self.acceleration.predicted, self.jerk.current)
-                    --self.velocity.predicted:setAdd(self.velocity.predicted, self.acceleration.predicted)
-                    self.position.predicted:setAdd(self.position.predicted, self.velocity.predicted)
-                end
                 self.age = 0
                 self.updated = false
             end
 
             self.speed = self.velocity.predicted:magnitude()
-            if self.speed > velocityThreshold then
+            if self.age > 0 and self.speed > velocityThreshold then
                 --self.acceleration.predicted:setAdd(self.acceleration.predicted, self.jerk.current)
                 self.velocity.predicted:setAdd(self.velocity.predicted, self.acceleration.predicted)
                 self.acceleration.predicted:setScale(0.75)
@@ -71,13 +70,14 @@ sectionTargets = {}
 function trackTargets()
     matches = {}
     newTargetGroup = {}
-	for i=1, 24, 3 do
+	for i = 1, 24, 3 do
 		if input.getBool(i) then
 			local newPosition = newVector(getInputVector(i))
-			table.insert(newTargetGroup,newPosition)
+            local newMass = getMass((i+2)/3)
+			table.insert(newTargetGroup, {mass = newMass, position = newPosition:clone()})
 			for j, oldTarget in pairs(oldTargetGroup) do
 				local positionDifference, distToFactor = oldTarget.position.predicted:distanceTo(newPosition), vehiclePosition:distanceTo(newPosition)
-				if positionDifference < clamp(maxError + oldTarget.speed * speedFactor + distToFactor * distanceFactor + oldTarget.age * ageFactor, 1, 150) then
+				if oldTarget.mass == newMass and positionDifference < clamp(maxError + oldTarget.speed * speedFactor + distToFactor * distanceFactor + oldTarget.age * ageFactor, 1, 150) then
 					table.insert(matches, {matchDistance = positionDifference, ID1 = #newTargetGroup, ID2 = j})
 				end
 			end
@@ -88,16 +88,17 @@ function trackTargets()
 		newTarget = newTargetGroup[match.ID1]
 		oldTarget = oldTargetGroup[match.ID2]
 		if newTarget and not oldTarget.updated then
-			oldTarget.position.current:copy(newTarget)
+			oldTarget.position.current:copy(newTarget.position)
 			oldTarget.updated = true
 			newTargetGroup[match.ID1] = nil
 		end
 	end
 	for i, newTarget in pairs(newTargetGroup) do
-        local targetToAdd = makeTarget(newTarget)
+        local targetToAdd = makeTarget(newTarget.position, newTarget.mass)
 		oldTargetGroup[targetToAdd.ID] = targetToAdd
 	end
 	targetCount = 0
+    sectionTargets = {}
 	for i, oldTarget in pairs(oldTargetGroup) do
 		if oldTarget.age > maxAge then
 			oldTargetGroup[i] = nil
@@ -105,22 +106,12 @@ function trackTargets()
 		end
 		oldTarget:updateTarget()
 		targetCount = targetCount + 1
-        for j, section in ipairs(sections) do
-            local currentSectionTarget = sectionTargets[j]
-            local newHorizontalError, newVerticalError = math.abs(yawSpeed(section[1],oldTarget.horizontalPlacement)), math.abs(section[2] - oldTarget.verticalPlacement)
-            if currentSectionTarget and oldTargetGroup[currentSectionTarget.ID] then
-                if currentSectionTarget.swap < 60 then
-                    currentSectionTarget.swap = currentSectionTarget.swap + 1
-                end
-                if currentSectionTarget.swap >= 60 and newHorizontalError < currentSectionTarget.horizontalError and newVerticalError < currentSectionTarget.verticalError+currentSectionTarget.horizontalError then
-                    sectionTargets[j] = {ID = oldTarget.ID, horizontalError = newHorizontalError, verticalError = newVerticalError, swap = 0}
-                end
-            else
-                sectionTargets[j] = {ID = oldTarget.ID, horizontalError = newHorizontalError, verticalError = newVerticalError, swap = 0}
-            end
+        if oldTarget.mass >= 3 then
+            table.insert(sectionTargets, {ID = oldTarget.ID, mass = oldTarget.mass, distance = oldTarget.distance})
         end
 		::targetRemoved::
 	end
+    table.sort(sectionTargets, function (a, b) return a.distance - a.mass*5 < b.distance - b.mass*5 end)
 	finalCount = targetCount
 end
 function yawSpeed(a,b)
