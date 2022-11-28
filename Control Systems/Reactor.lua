@@ -104,6 +104,10 @@ function onTick()
     click = input.getBool(4)
     clickX, clickY = input.getNumber(9), input.getNumber(10)
 
+    for b, button in pairs(buttons) do
+        button:updateTick(click, wasClick, clickX, clickY)
+    end
+
     on = input.getBool(1)
     connected = input.getBool(2)
     recv = input.getBool(3)
@@ -171,7 +175,7 @@ function onDraw()
     progressBars.sysCharge:update(sysBatt)
 
     for b, button in pairs(buttons) do
-        button:update(click, wasClick, clickX, clickY)
+        button:updateDraw(click, wasClick, clickX, clickY)
     end
     for i, indicator in pairs(indicators) do
         indicator:update()

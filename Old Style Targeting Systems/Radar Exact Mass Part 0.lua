@@ -45,13 +45,19 @@ filterMassValues =
     100,  --Fluid Crate, Propane, Large Propane
     112, -- Small Fuel Gantry
     125,  --Tool Cart
+    160, --Animal
     175,  --Large Cart
+    180, --Animal
     300,  --Large Chest
+    320,  -- Animal
     347,  --Gas Gantry
     397, -- Coal Gantry
     400,  --Loot Crate
+    405,  --Animal
     2499, --Container
-    2500  --Tree
+    2500,  --Tree
+    2623,  --Animal
+    4170, --Animal
 }
 
 excludeMasses = {}

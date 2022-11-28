@@ -82,6 +82,11 @@ function onTick()
     clickY = input.getNumber(4)
     wasClick = click
     click = input.getBool(1)
+
+    for b, button in pairs(buttons) do
+        button:updateTick(click, wasClick, clickX, clickY)
+    end
+
     output.setNumber(1, 1 - buttons.zoom.onPercent)
     output.setNumber(2, buttons.viewSelect.onPercent)
     output.setBool(1, buttons.nightVision.pressed)
@@ -95,7 +100,7 @@ function onDraw()
     screen.drawRect(1, 1, 29, 157)
 
     for b, button in pairs(buttons) do
-        button:update(click, wasClick, clickX, clickY)
+        button:updateDraw()
     end
 
     setToColor(lightGrey)

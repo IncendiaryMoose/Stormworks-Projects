@@ -113,6 +113,15 @@ function onTick()
     clickY = input.getNumber(4)
     wasClick = click
     click = input.getBool(1)
+
+    for b, button in pairs(buttons) do
+        button:updateTick(click, wasClick, clickX, clickY)
+    end
+    for b, button in pairs(screenControlls) do
+        button:updateTick(click, wasClick, clickX, clickY)
+    end
+
+
     firstClick = click and 1000000 or 0
     --secondClick = input.getBool(2) and 1000000 or 0
     firstClick = firstClick + clickX + clickY * 1000
@@ -168,7 +177,7 @@ function onDraw()
         setToColor(orangeOff)
         screen.drawRect(1, 128, 42, 30)
         for b, button in pairs(buttons) do
-            button:update(click, wasClick, clickX, clickY)
+            button:updateDraw()
         end
         zoom = buttons.zoom.onPercent * 49 + 1
         range = buttons.range.onPercent
@@ -189,7 +198,7 @@ function onDraw()
     setToColor(purpleOff)
     screen.drawRect(w - 44, 116, 42, 42)
     for b, button in pairs(screenControlls) do
-        button:update(click, wasClick, clickX, clickY)
+        button:updateDraw()
     end
 
 end

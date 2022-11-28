@@ -100,6 +100,11 @@ function onTick()
     click = input.getBool(1)
     clickX, clickY = input.getNumber(3), input.getNumber(4)
     iAmmo, heAmmo = input.getNumber(1), input.getNumber(2)
+
+    for b, button in pairs(buttons) do
+        button:updateTick(click, wasClick, clickX, clickY)
+    end
+
     output.setNumber(1, 1 - buttons.throttle.onPercent)
     output.setBool(1, buttons.ammoDoor.pressed)
     output.setBool(2, not buttons.ammoConnector.pressed)
@@ -114,11 +119,11 @@ function onDraw()
     progressBars.heAmmo:update(heAmmo)
 
     for b, button in pairs(buttons) do
-        button:update(click, wasClick, clickX, clickY)
+        button:updateDraw()
     end
-    for i, indicator in pairs(indicators) do
-        indicator:update()
-    end
+    -- for i, indicator in pairs(indicators) do
+    --     indicator:update()
+    -- end
 end
 
 function roughEquals(a, b, c)

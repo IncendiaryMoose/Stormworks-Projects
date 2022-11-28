@@ -109,15 +109,11 @@ yaw = 0
 
 headingError = 0
 
-moving = false
-steering = false
 numbers = {}
 bools = {}
 
 engineReadyCapacitor = 0
 startup = 0
-
-gpsAZ = 0
 
 atWaypointCapacitor = 0
 headingCapacitor = 0
@@ -125,53 +121,50 @@ dockingStage = 0
 function onTick()
     clearOutputs()
 
+    gpsAZ = (numbers[16] + numbers[17])/2
+
+     -- Enable engine if 'Enable' is pressed, but do not disable engine if it is then turned off
     engineEnabled = bools[1] or engineEnabled
 
+     -- Count how many consecutive ticks the engine has been at running speed fpr
     engineReadyCapacitor = (numbers[18] > engineRpsThreshold or (gpsAZ < safeAlt and bools[1])) and min(engineReadyCapacitor + 1, 60) or 0
 
+     -- If the engine has been above running speed for one second, mark it as ready for flight
     engineReady = engineReadyCapacitor == 60
 
+     -- Count how many consecutive ticks the engine has been flight-ready for
     startup = engineReady and min(startup + 1, startupTime) or 0
 
+     -- If the engine is flight-ready, run all required systems for setting control values for the vehicle
     if engineReady then
         outputBools[3] = true
 
         seatWS = clamp((numbers[21] > 0.1 and numbers[21] or autoThrottle and min(distance/1900, 1) or 0) + numbers[2], -1, 1)
-        seatUD = numbers[4]
-        --seat.isAD = math.abs(seat.AD) > inputThreshold
         seatIsWS = math.abs(seatWS) > inputThreshold
-        --seat.isLR = math.abs(seat.LR) > inputThreshold
-        --seat.isUD = math.abs(seatUD) > inputThreshold
 
         gpsX = numbers[5]
         gpsY = numbers[6]
-        gpsAZ = (numbers[16] + numbers[17])/2
-
-        ground = numbers[20]
 
         roll = math.atan(math.sin(numbers[9] * PI2), math.sin(numbers[11] * PI2))
         rawHeading = numbers[10]
 
-        xVelocity = numbers[12]
         yVelocity = numbers[13]
-        rotationVelocity = numbers[14]
-
-        if startup < startupTime then
+        if startup < startupTime then -- If engine has recently reached running speed
             if startup < 10 then
-                targetZ = gpsAZ + startAlt
-                targetHeading = rawHeading
                 targetX = gpsX
                 targetY = gpsY
+                targetZ = gpsAZ + startAlt
+                targetHeading = rawHeading
             else
                 targetZ = targetZ + startAltRaise
             end
             outputBools[4] = true
         end
-        if not bools[1] then
-            dockingStage = dockingStage == 0 and numbers[27] ~=0 and 1 or dockingStage
-            if ground > landingAlt then
-                if dockingStage == 0 or dockingStage == 3 then
-                    targetZ = targetZ - clamp(ground/100, startAltRaise, zSpeed/3)
+        if not bools[1] then -- If the 'Enable' button is off
+            dockingStage = numbers[27] ~=0 and max(1, dockingStage) or 0
+            if numbers[20] > landingAlt then -- If the vehicle is more than 'landingAlt' meters above the ground
+                if dockingStage == 0 or dockingStage == 3 then -- If autodock is not running, or it has finished running
+                    targetZ = targetZ - clamp(numbers[20]/100, startAltRaise, zSpeed/3)
                 end
             else
                 engineEnabled = false
@@ -181,19 +174,20 @@ function onTick()
         if seatIsWS or math.abs(numbers[3]) > inputThreshold then
             moving = true
             outputBools[29] = true
-        elseif math.abs(xVelocity) < movementThreshold and math.abs(yVelocity) < movementThreshold then
+        elseif math.abs(numbers[12]) < movementThreshold and math.abs(yVelocity) < movementThreshold then
             moving = false
             outputBools[30] = true
         end
 
         if math.abs(numbers[1]) > inputThreshold then
             steering = true
-        elseif rotationVelocity < steeringThreshold then
+        elseif numbers[14] < steeringThreshold then
             steering = false
         end
+
         altMultiplier = math.abs(normalize(yVelocity, -maxVy, maxVy)) * zSpeedGain
-        if math.abs(seatUD) > inputThreshold then
-            targetZ = targetZ + seatUD * sensetivity * zSpeed + seatUD * altMultiplier
+        if math.abs(numbers[4]) > inputThreshold then
+            targetZ = targetZ + numbers[4] * (sensetivity * zSpeed + altMultiplier)
             outputBools[28] = true
         end
 
@@ -225,9 +219,11 @@ function onTick()
                     targetZ = targetZ + clamp(((dockingStage > 0 and (numbers[27] + 200) or numbers[24]) - targetZ)/2, -altMultiplier - zSpeed/10, altMultiplier + zSpeed/10)
                 end
             elseif atWaypointCapacitor == 60 then
+                local headingError = wrappedDifference(rawHeading, numbers[28])
+
                 dockingStage = max(dockingStage, 2)
-                targetHeading = rawHeading - clamp(wrappedDifference(rawHeading, numbers[28])/5, -yawSpeed/10, yawSpeed/10) -- nearestDockYaw
-                headingCapacitor = math.abs(wrappedDifference(rawHeading, numbers[28])) < 0.001 and min(headingCapacitor + 1, 60) or 0
+                targetHeading = rawHeading - clamp(headingError/5, -yawSpeed/10, yawSpeed/10) -- nearestDockYaw
+                headingCapacitor = math.abs(headingError) < 0.001 and min(headingCapacitor + 1, 60) or 0
                 if headingCapacitor == 60 then
                     dockingStage = 3
                     headingCapacitor = 0
@@ -243,41 +239,66 @@ function onTick()
             targetVYaw = wrappedDifference(rawHeading, targetHeading)
         end
 
-        targetZ = max(targetZ, safeAlt)
+         -- Ensure vehicle does not try to become submarine
+        targetZ = clamp(max(targetZ, safeAlt), gpsAZ - length - width, gpsAZ + length + width)
 
-        headingPID:Update(targetVYaw, rotationVelocity * yawRate)
-        xHoldPID:Update(targetVX, xVelocity)
+         -- Find desired roll and flap for steering
+        headingPID:Update(targetVYaw, numbers[14] * yawRate)
+
+         -- Find desired roll and vehicle roll for strafe
+        xHoldPID:Update(targetVX, numbers[12])
+
+         -- Find desired pitch, vehicle pitch, and boost for thrust
         yHoldPID:Update(targetVY, yVelocity)
 
+         -- Find offsets for altitude targets to apply vehicle pitch (Redirects rotor thrust)
         pitchOffset = normalize(yHoldPID.output, -yRange, yRange) * pitchScale
+
+         -- Find offsets for altitude targets to apply vehicle roll (Redirects rotor thrust)
         rollOffset = normalize(xHoldPID.output, -xRange, xRange) * rollScale
 
+         -- Find offsets for altitude targets to apply angle of attack adjustment (Redirects boost thrust)
         altPitchOffset = normalize(yVelocity, -maxVy, maxVy) * normalize(targetZ - numbers[15], -altPitchRange, altPitchRange) * altPitchScale
 
+         -- Find desired collective and flap for each rotor group
         altitude_pids[1]:Update(clamp(targetZ - pitchOffset + altPitchOffset, max(gpsAZ - length, safeAlt), gpsAZ + length), numbers[15])
         altitude_pids[2]:Update(clamp(targetZ + rollOffset + pitchOffset, max(max(numbers[15] - length, numbers[17] - width), safeAlt), min(numbers[15] + length, numbers[17] + width)), numbers[16])
         altitude_pids[3]:Update(clamp(targetZ - rollOffset + pitchOffset, max(max(numbers[15] - length, numbers[16] - width), safeAlt), min(numbers[15] + length, numbers[16] + width)), numbers[17])
 
+         -- Set collective, pitch, and roll for rotor groups
         outputRotor(1, altitude_pids[1].output, yHoldPID.output, xHoldPID.output + headingPID.output)
         outputRotor(8, altitude_pids[2].output, yHoldPID.output, xHoldPID.output - headingPID.output)
         outputRotor(15, altitude_pids[3].output, yHoldPID.output, -xHoldPID.output + headingPID.output)
 
+         -- Set steering flaps
         outputNumbers[22] = headingPID.output * sign(yVelocity) * steeringFlapRange * (1 - math.abs(roll/(tiltThreshold*2)))
 
+         -- Set boost if throttle is applied, or if boost is already running (This allows the system to apply reverse boost when stopping)
         outputNumbers[23] = (math.abs(numbers[19]) > boostRpsThreshold or seatIsWS) and yHoldPID.output or 0
 
+         -- Set desired horizontal movement (Unsure of use)
         outputNumbers[24] = xHoldPID.output
 
+         -- Beep if vehicle is in motion
         outputBools[6] = moving
+
+         -- Beep if vehicle is outside of safe operating angle
         outputBools[7] = math.abs(numbers[8] * PI2) > tiltThreshold or math.abs(roll) > tiltThreshold
     end
 
+     -- Beep during engine spin-up
     outputBools[31] = not engineReady
 
-    dockingStage = ((not engineReady) or bools[1]) and 0 or dockingStage
+     -- Clear docking state if 'Enable' is on or engines are off
+    dockingStage = (bools[1] or not engineReady) and 0 or dockingStage
 
+     -- Turn on the engine if engine is enabled
     outputBools[1] = engineEnabled
+
+     -- Gear down if engine is below running speed, or recently above, or if 'Enable' is off and autodock is not running
     outputBools[2] = startup < startupTime/4 or not (bools[1] or dockingStage == 1)
+
+     -- Beep if startup has completed
     outputBools[8] = startup == startupTime
     setOutputs()
 end
